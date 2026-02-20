@@ -125,7 +125,7 @@ class _PageDiagramState extends State<PageDiagram> {
         Padding(
           padding: EdgeInsetsGeometry.symmetric(
             vertical: MySize(context).h * 0.05,
-            horizontal: MySize(context).w * 0.03,
+            horizontal: MySize(context).w * 0.01,
           ),
           child: Column(children: [
             Text("Sauf - O - Mat",
