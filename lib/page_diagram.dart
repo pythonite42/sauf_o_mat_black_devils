@@ -299,15 +299,13 @@ class _PageDiagramState extends State<PageDiagram> {
                                                       child: Stack(
                                                         children: [
                                                           Row(children: [
-                                                            Stack(children: [
                                                             Container(
                                                               height: constraints.maxHeight * 0.5,
                                                               width: totalWidth * shot / chartMaxValue,
                                                               decoration: BoxDecoration(
                                                                 color: data!.color!.withValues(alpha: 0.9),
                                                                 borderRadius: BorderRadius.horizontal(
-                                                                    right:
-                                                                        Radius.circular(constraints.maxHeight * 0.08),
+                                                                  right: Radius.circular(constraints.maxHeight * 0.08),
                                                                 ),
                                                                 boxShadow: [
                                                                   BoxShadow(
@@ -317,8 +315,22 @@ class _PageDiagramState extends State<PageDiagram> {
                                                                   ),
                                                                 ],
                                                               ),
+                                                              alignment: Alignment.centerRight,
+                                                              child: Visibility(
+                                                                visible: shot >= (chartMaxValue / 1.5),
+                                                                child: Text(
+                                                                  '${shot.toStringAsFixed(0)} Shots ',
+                                                                  style: TextStyle(
+                                                                    fontSize: fontSizeLegend,
+                                                                    fontWeight: FontWeight.bold,
+                                                                    color: fontColor,
+                                                                  ),
+                                                                ),
+                                                              ),
                                                             ),
-                                                              Text(
+                                                            Visibility(
+                                                              visible: shot < (chartMaxValue / 1.5),
+                                                              child: Text(
                                                                 ' ${shot.toStringAsFixed(0)} Shots',
                                                                 style: TextStyle(
                                                                   fontSize: fontSizeLegend,
@@ -326,7 +338,7 @@ class _PageDiagramState extends State<PageDiagram> {
                                                                   color: fontColor,
                                                                 ),
                                                               ),
-                                                            ]),
+                                                            ),
                                                             Visibility(
                                                               visible: false,
                                                               maintainSize: true,
