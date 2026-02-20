@@ -10,7 +10,6 @@ import 'package:sauf_o_mat_display_app/page_schedule.dart';
 import 'package:sauf_o_mat_display_app/page_top3.dart';
 import 'package:sauf_o_mat_display_app/page_advertising.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sauf_o_mat_display_app/server_manager.dart';
 
 void main() async {
@@ -27,7 +26,6 @@ void main() async {
     await windowManager.show();
     await windowManager.focus();
   });
-  await dotenv.load(fileName: ".env");
 
   if (String.fromEnvironment('MODE') == "testing") {
     customDurations = CustomDurationsTest();
