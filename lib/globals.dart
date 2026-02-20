@@ -30,6 +30,6 @@ class GlobalSettings {
 
   // page diagram
   static const int totalBarsVisible = 5;
-  static const int totalGridLinesVisible = 5;
+  static const int axisNumbers = 4;
   static const double groupNameSpaceFactor = 0.37; //Anteilig an ganzer Breite
 }

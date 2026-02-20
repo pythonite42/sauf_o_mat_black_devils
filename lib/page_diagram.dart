@@ -77,7 +77,7 @@ class _PageDiagramState extends State<PageDiagram> {
           _chartData?.sort((a, b) {
             return (b.shot ?? 0).compareTo(a.shot ?? 0);
           });
-          maxValue = _chartData?[0].shot ?? 0 + 50;
+          maxValue = (_chartData?[0].shot ?? 0);
         });
       }
     } catch (e) {
@@ -165,18 +165,17 @@ class _PageDiagramState extends State<PageDiagram> {
                             emptyCountRightOfFirst = 3;
                           }
 
-                          int chartMaxValue = maxValue ?? 1 + emptyCountRightOfFirst;
+                          int chartMaxValue = (maxValue ?? 1) + emptyCountRightOfFirst;
 
                           while (true) {
-                            if ((chartMaxValue / GlobalSettings.totalGridLinesVisible) % gridIntervalsDividableBy ==
-                                0) {
+                            if ((chartMaxValue / (GlobalSettings.axisNumbers + 1)) % gridIntervalsDividableBy == 0) {
                               break;
                             } else {
                               chartMaxValue++;
                             }
                           }
 
-                          var gridInterval = chartMaxValue / GlobalSettings.totalGridLinesVisible;
+                          var gridInterval = chartMaxValue / (GlobalSettings.axisNumbers + 1);
 
                           return Stack(
                             children: <Widget>[
@@ -196,20 +195,19 @@ class _PageDiagramState extends State<PageDiagram> {
                                   child: Container(width: chartWidth, height: frameLineWidth, color: fontColor)),
                               // Horizontal grid lines (exclude the topmost line)
                               ...List.generate(
-                                (GlobalSettings.totalGridLinesVisible).floor(),
+                                5,
                                 (index) => Positioned(
                                   left: groupNameWidth,
-                                  top: (index + 1) * (availableHeight / GlobalSettings.totalGridLinesVisible),
+                                  top: (index + 1) * (availableHeight / 5),
                                   child: gridLine,
                                 ),
                               ),
 
                               // Numeric labels along the bottom (x-axis)
                               ...List.generate(
-                                (GlobalSettings.totalGridLinesVisible).floor(),
+                                (GlobalSettings.axisNumbers + 1).floor(),
                                 (index) => Positioned(
-                                  left: groupNameWidth +
-                                      (index + 1) * (chartWidth / GlobalSettings.totalGridLinesVisible),
+                                  left: groupNameWidth + (index + 1) * (chartWidth / (GlobalSettings.axisNumbers + 1)),
                                   top: availableHeight,
                                   child: Text(
                                     ((index + 1) * gridInterval).toInt().toString(),
