@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:sauf_o_mat_display_app/backend_connection.dart';
-import 'package:sauf_o_mat_display_app/theme.dart';
-import 'package:sauf_o_mat_display_app/globals.dart';
+import 'package:sauf_o_mat_black_devils/backend_connection.dart';
+import 'package:sauf_o_mat_black_devils/theme.dart';
+import 'package:sauf_o_mat_black_devils/globals.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:math';
 import 'package:google_fonts/google_fonts.dart';
@@ -35,13 +35,6 @@ class _PageDiagramState extends State<PageDiagram> {
   late Timer _chartDataReloadTimer;
   double barHeight = 0;
   int? maxValue;
-
-  bool showPopup = false;
-  String popupDataId = "";
-  String imageUrl = "";
-  String chaserGroupName = "";
-  String leaderGroupName = "";
-  int leaderPoints = 0;
 
   Color fontColor = Colors.white;
 
@@ -85,20 +78,6 @@ class _PageDiagramState extends State<PageDiagram> {
             return (b.shot ?? 0).compareTo(a.shot ?? 0);
           });
           maxValue = _chartData?[0].shot ?? 0 + 50;
-
-          /* final medals = ['🥇 ', '🥈 ', '🥉 '];
-          for (int i = 0; i < _chartData!.length; i++) {
-            final originalName = _chartData![i].group.toString().replaceAll(RegExp(r'[🥇🥈🥉]'), '');
-            if (i < 3) {
-              _chartData![i] = ChartData(
-                group: '${medals[i]}$originalName',
-                longdrink: _chartData![i].longdrink,
-                beer: _chartData![i].beer,
-                shot: _chartData![i].shot,
-                luz: _chartData![i].luz,
-              );
-            }
-          } */
         });
       }
     } catch (e) {
@@ -143,17 +122,6 @@ class _PageDiagramState extends State<PageDiagram> {
 
     return Stack(
       children: [
-        /* Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            child: Image.asset(
-              'assets/scroll.png',
-              width: MySize(context).w,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-        ), */
         Padding(
           padding: EdgeInsetsGeometry.symmetric(
             vertical: MySize(context).h * 0.05,

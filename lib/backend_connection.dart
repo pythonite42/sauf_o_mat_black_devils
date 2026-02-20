@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:jose/jose.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:flutter/material.dart';
-import 'package:sauf_o_mat_display_app/backend_testing.dart';
+import 'package:sauf_o_mat_black_devils/backend_testing.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 /// Singleton service to handle Salesforce JWT integration
@@ -19,7 +17,6 @@ class SalesforceService {
   static const String consumerKey = String.fromEnvironment('SF_CONSUMER_KEY');
   static const String username = String.fromEnvironment('SF_USERNAME');
   static const String loginUrl = String.fromEnvironment('SF_LOGIN_URL');
-  static const String privateKeyPath = 'assets/server.key';
   static const bool isTestVersion = String.fromEnvironment('MODE') == 'testing';
   static const bool isProdVersion = String.fromEnvironment('MODE') == 'production';
 
@@ -34,7 +31,7 @@ class SalesforceService {
 
   /// Generates a signed JWT and exchanges it for a Salesforce access token
   Future<String> _fetchNewToken() async {
-    final privateKeyPem = await rootBundle.loadString(privateKeyPath);
+    final privateKeyPem = await rootBundle.loadString('assets/server.key');
     final key = JsonWebKey.fromPem(privateKeyPem);
     final jwtBuilder = JsonWebSignatureBuilder()
       ..jsonContent = {
@@ -160,195 +157,5 @@ class SalesforceService {
       debugPrint('Error: $e');
       return [];
     }
-  }
-
-  Future<Map> getPageDiagramPopUp() async {
-    if (isTestVersion) return TestBackendData().getPageDiagramPopUp();
-    try {
-      String query = isProdVersion
-          ? 'SELECT Id, VisualizedAt__c, ChasingTeam__r.Name, WantedTeam__r.Name, WantedTeam__r.Logo__c, WantedTeam__r.Punktzahl__c FROM CatchUp__c WHERE VisualizedAt__c = null AND RankDeltaIsOne__c = true AND IsLessThan1Minute__c = true ORDER BY LastModifiedDate DESC LIMIT 1'
-          : 'SELECT Id, VisualizedAt__c, ChasingTeam__r.Name, WantedTeam__r.Name, WantedTeam__r.Logo__c, WantedTeam__r.Punktzahl__c FROM CatchUp__c WHERE VisualizedAt__c = null AND RankDeltaIsOne__c = true ORDER BY LastModifiedDate DESC LIMIT 1';
-      final data = await getRequest(query);
-      var record = data["records"][0];
-      return {
-        "showPopup": true,
-        "popupDataId": record["Id"],
-        "imageUrl": record["WantedTeam__r"]["Logo__c"] ?? "",
-        "chaserGroupName": record["ChasingTeam__r"]["Name"],
-        "leaderGroupName": record["WantedTeam__r"]["Name"],
-        "leaderPoints": (record["WantedTeam__r"]["Punktzahl__c"]).toInt(),
-      };
-    } catch (e) {
-      debugPrint('Salesforce Error getPageDiagramPopUp: $e');
-      return {
-        "showPopup": false,
-        "popupDataId": "",
-        "imageUrl": "",
-        "chaserGroupName": "",
-        "leaderGroupName": "",
-        "leaderPoints": 0,
-      };
-    }
-  }
-
-  Future<bool> setPageDiagramVisualizedAt(String id, DateTime visualisedAt) async {
-    if (isTestVersion) return true;
-    try {
-      patchRequest(id, "CatchUp__c", {"VisualizedAt__c": formatDateTime(visualisedAt)});
-      return true;
-    } catch (e) {
-      debugPrint('Error: $e');
-      return false;
-    }
-  }
-
-  Future<List<Map>> getPageTop3() async {
-    if (isTestVersion) return TestBackendData().getPageTop3();
-    try {
-      final data = await getRequest(
-          'SELECT Anzahl_Bargetr_nke__c , Anzahl_Bier_Wein_Schorle__c , Anzahl_Kaffee_Lutz__c , AnzahlShots__c , Punktzahl__c, Logo__c, NAME FROM Team__c WHERE Rang__c < 4');
-      var records = data["records"];
-      List<Map> returnData = [];
-      for (var record in records) {
-        returnData.add({
-          "longdrink": (record["Anzahl_Bargetr_nke__c"]).toInt(),
-          "beer": (record["Anzahl_Bier_Wein_Schorle__c"]).toInt(),
-          "shot": (record["AnzahlShots__c"]).toInt(),
-          "luz": (record["Anzahl_Kaffee_Lutz__c"]).toInt(),
-          "punktzahl": (record["Punktzahl__c"]).toInt(),
-          "groupLogo": record["Logo__c"] ?? "",
-          "name": record["Name"] ?? "",
-        });
-      }
-      if (returnData.length < 3) {
-        while (returnData.length < 3) {
-          returnData.add({
-            "longdrink": 0,
-            "beer": 0,
-            "shot": 0,
-            "luz": 0,
-            "punktzahl": 0,
-            "groupLogo": "",
-            "name": "",
-          });
-        }
-      }
-      return returnData;
-    } catch (e) {
-      debugPrint('Error: $e');
-      return [];
-    }
-  }
-
-  Future<List<Map>> getPageTop3BackgroundImages() async {
-    if (isTestVersion) return TestBackendData().getPageTop3BackgroundImages();
-    try {
-      final data = await getRequest('SELECT ImageURL__c, Name__c FROM BackgroundImage__c');
-      debugPrint(data["records"].toString());
-      List<Map> returnData = data["records"].map<Map>((record) {
-        return {
-          "name": record["Name__c"] ?? "",
-          "imageUrl": record["ImageURL__c"] ?? "",
-        };
-      }).toList();
-
-      returnData.shuffle(Random());
-
-      return returnData.take(3).toList();
-    } catch (e) {
-      debugPrint('Error: $e');
-      return [];
-    }
-  }
-
-  Future<Map> getPagePrize() async {
-    if (isTestVersion) return TestBackendData().getPagePrize();
-    try {
-      final data = await getRequest('SELECT Logo__c, Punktzahl__c, NAME FROM Team__c WHERE Rang__c = 1');
-      return {
-        "logo": data["records"][0]["Logo__c"] ?? "",
-        "name": data["records"][0]["Name"] ?? "",
-        "points": (data["records"][0]["Punktzahl__c"]).toInt(),
-      };
-    } catch (e) {
-      debugPrint('Error: $e');
-      return {};
-    }
-  }
-
-  Future<Map> getPageQuote() async {
-    if (isTestVersion) return TestBackendData().getPageQuote();
-    try {
-      Map data = await getRequest(
-          'SELECT Id, Comment1__c, Comment2__c, Comment3__c, Commentator__c, CommentatorHandle__c, ImageURL__c FROM SocialMediaComment__c WHERE VisualizedAt__c = null ORDER BY LastModifiedDate DESC LIMIT 1');
-      debugPrint(data["records"].toString());
-      if (data["records"].isEmpty) {
-        data = await getRequest(
-            'SELECT Id, Comment1__c, Comment2__c, Comment3__c, Commentator__c, CommentatorHandle__c, ImageURL__c FROM SocialMediaComment__c ORDER BY VisualizedAt__c ASC LIMIT 1');
-      }
-      debugPrint(data["records"].toString());
-
-      var record = data["records"][0];
-      List<String> quotes = [record["Comment1__c"] ?? "", record["Comment2__c"] ?? "", record["Comment3__c"] ?? ""];
-      quotes.removeWhere((quote) => quote.trim().isEmpty);
-      return {
-        "recordId": record["Id"],
-        "name": record["Commentator__c"] ?? "",
-        "handle": record["CommentatorHandle__c"] ?? "",
-        "quotes": quotes,
-        "image": record["ImageURL__c"] ?? "",
-      };
-    } catch (e) {
-      debugPrint('Error: $e');
-      return {};
-    }
-  }
-
-  Future<bool> setPageQuoteQueryUsed(String id, DateTime visualisedAt) async {
-    if (isTestVersion) return true;
-    try {
-      patchRequest(id, "SocialMediaComment__c", {"VisualizedAt__c": formatDateTime(visualisedAt)});
-      return true;
-    } catch (e) {
-      debugPrint('Error: $e');
-      return false;
-    }
-  }
-
-  Future<Map> getPageAdvertising() async {
-    if (isTestVersion) return TestBackendData().getPageAdvertising();
-    try {
-      Map data = await getRequest(
-          'SELECT Id, ImageURL__c, Subject__c, Description__c FROM Advertisement__c WHERE VisualizedAt__c = null ORDER BY LastModifiedDate DESC LIMIT 1');
-      if (data["records"].isEmpty) {
-        data = await getRequest(
-            'SELECT Id, ImageURL__c, Subject__c, Description__c FROM Advertisement__c ORDER BY VisualizedAt__c ASC LIMIT 1');
-      }
-      debugPrint(data["records"].toString());
-      return {
-        "id": data["records"][0]["Id"],
-        "headline": data["records"][0]["Subject__c"] ?? "",
-        "text": data["records"][0]["Description__c"] ?? "",
-        "image": data["records"][0]["ImageURL__c"] ?? "",
-      };
-    } catch (e) {
-      debugPrint('Error: $e');
-      return {};
-    }
-  }
-
-  Future<bool> setPageAdvertisingVisualizedAt(String id, DateTime visualisedAt) async {
-    if (isTestVersion) return true;
-    try {
-      patchRequest(id, "Advertisement__c", {"VisualizedAt__c": formatDateTime(visualisedAt)});
-      return true;
-    } catch (e) {
-      debugPrint('Error: $e');
-      return false;
-    }
-  }
-
-  String formatDateTime(DateTime dateTime) {
-    return DateFormat('yyyy-MM-ddTHH:mm:ss.SSSZ').format(dateTime.toUtc());
   }
 }
