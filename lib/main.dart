@@ -1,0 +1,321 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:sauf_o_mat_display_app/theme.dart';
+import 'package:sauf_o_mat_display_app/globals.dart';
+import 'package:sauf_o_mat_display_app/page_diagram.dart';
+import 'package:sauf_o_mat_display_app/page_livestream.dart';
+import 'package:sauf_o_mat_display_app/page_prize.dart';
+import 'package:sauf_o_mat_display_app/page_quote.dart';
+import 'package:sauf_o_mat_display_app/page_schedule.dart';
+import 'package:sauf_o_mat_display_app/page_top3.dart';
+import 'package:sauf_o_mat_display_app/page_advertising.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:sauf_o_mat_display_app/server_manager.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+
+  WindowOptions windowOptions = WindowOptions(
+    size: Size(1400, 900),
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    titleBarStyle: TitleBarStyle.normal,
+  );
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
+  await dotenv.load(fileName: ".env");
+
+  if (String.fromEnvironment('MODE') == "testing") {
+    customDurations = CustomDurationsTest();
+  } else {
+    customDurations = CustomDurationsProduction();
+  }
+
+  // Connect to WebSocket before running app
+  /* const String ipAddress = String.fromEnvironment('SERVER_IP');
+  const String port = String.fromEnvironment('SERVER_PORT');
+
+  if (ipAddress.isEmpty || port.isEmpty) {
+    throw Exception("Missing dart-defines!");
+  }
+
+  await ServerManager().connect("ws://$ipAddress:$port"); */
+
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Sauf-O-Mat',
+      theme: appTheme,
+      debugShowCheckedModeBanner: false,
+      home: MyScaffold(),
+    );
+  }
+}
+
+class MyScaffold extends StatefulWidget {
+  const MyScaffold({super.key});
+
+  @override
+  State<MyScaffold> createState() => _MyScaffoldState();
+}
+
+class _MyScaffoldState extends State<MyScaffold> {
+  bool titleBarVisible = true;
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+
+  int pageIndex = 0;
+  bool animateNavigation = true;
+  bool overridePageIndex = false;
+
+  late final MessageHandler socketPageIndexListener;
+
+  Timer? _pageIndexReloadTimer;
+  Timer? _prePrizeTimer;
+  Timer? _unfreezeTimer;
+  bool _socketFrozen = false;
+  int _nextPrizeIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+
+    socketPageIndexListener = (data) {
+      debugPrint("socket event received: $data");
+      if (data['event'] == 'freeze' && data["freeze"] == true) {
+        //wenn 5 Minuten vor Preis, dann wird auf prize page gewechselt. wenn dann per app überschrieben wird ist der freeze automatisch drin bis eine minute nach preisZeit. Das wird in der App nicht angezeigt. Ist das okay so?
+        _cancelAutoTimer();
+      } else if (data['event'] == 'freeze' && data["freeze"] == false) {
+        _socketFrozen = false;
+        _maybeStartAutoTimer();
+      }
+      if (data['event'] == 'pageIndex' && data['index'] is int) {
+        int newIndex = data['index'];
+        if (newIndex != pageIndex || data['reset'] == true) {
+          animateNavigation = !(data['reset'] == true);
+          overridePageIndex = true;
+          _navigateToPage(newIndex);
+        }
+      }
+    };
+
+    ServerManager().addListener(socketPageIndexListener);
+
+    _startPageIndexTimer();
+    _schedulePrizeGuard();
+  }
+
+  void _navigateToPage(int index) {
+    if (index == 2 && DateTime.now().isAfter(GlobalSettings.prizeTimes.last)) return;
+    if (index == 3 && DateTime.now().isAfter(GlobalSettings.lastPerformance)) return;
+
+    setState(() {
+      pageIndex = index;
+    });
+
+    if (_navigatorKey.currentContext != null) {
+      //_navigatorKey.currentState!.pushReplacementNamed('/page$index');
+    }
+  }
+
+  void _startPageIndexTimer() {
+    _pageIndexReloadTimer?.cancel();
+    _pageIndexReloadTimer = Timer.periodic(Duration(seconds: customDurations.indexNavigationChange), (_) {
+      if (!overridePageIndex) {
+        int nextIndex = (pageIndex + 1) % 6;
+        if (nextIndex == 2 && DateTime.now().isAfter(GlobalSettings.prizeTimes.last)) {
+          nextIndex++;
+        }
+        if (nextIndex == 3 && DateTime.now().isAfter(GlobalSettings.lastPerformance)) {
+          nextIndex++;
+        }
+        animateNavigation = true;
+        //_navigateToPage(nextIndex);
+      } else {
+        overridePageIndex = false;
+      }
+    });
+  }
+
+  void _schedulePrizeGuard() {
+    _prePrizeTimer?.cancel();
+    _unfreezeTimer?.cancel();
+
+    if (_nextPrizeIndex >= GlobalSettings.prizeTimes.length) {
+      return;
+    }
+
+    final prizeTime = GlobalSettings.prizeTimes[_nextPrizeIndex];
+    final preStart = prizeTime.subtract(Duration(seconds: customDurations.changeToPrizePageBeforePrizeTime));
+    final preEnd = prizeTime.add(Duration(seconds: customDurations.stayOnPrizePageAfterPrizeTime));
+    final now = DateTime.now();
+
+    if (now.isBefore(preStart)) {
+      final wait = preStart.difference(now);
+      _prePrizeTimer = Timer(wait, _enterPrizeFreeze);
+    } else if (!now.isAfter(preEnd)) {
+      _enterPrizeFreeze();
+      final remaining = preEnd.difference(now);
+      _unfreezeTimer = Timer(remaining, _exitPrizeFreeze);
+    } else {
+      _nextPrizeIndex++;
+      _schedulePrizeGuard();
+    }
+  }
+
+  void _enterPrizeFreeze() {
+    animateNavigation = true;
+    _navigateToPage(2);
+    _cancelAutoTimer();
+
+    _unfreezeTimer?.cancel();
+    _unfreezeTimer = Timer(
+        Duration(
+            seconds: customDurations.changeToPrizePageBeforePrizeTime + customDurations.stayOnPrizePageAfterPrizeTime),
+        _exitPrizeFreeze);
+  }
+
+  void _exitPrizeFreeze() {
+    _maybeStartAutoTimer();
+    _nextPrizeIndex++;
+    _schedulePrizeGuard();
+  }
+
+  void _cancelAutoTimer() {
+    _pageIndexReloadTimer?.cancel();
+    _pageIndexReloadTimer = null;
+  }
+
+  void _maybeStartAutoTimer() {
+    if (_socketFrozen) return;
+    if (_pageIndexReloadTimer != null) return;
+    _startPageIndexTimer();
+  }
+
+  @override
+  void dispose() {
+    ServerManager().removeListener(socketPageIndexListener);
+    _pageIndexReloadTimer?.cancel();
+    _prePrizeTimer?.cancel();
+    _unfreezeTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(children: [
+        Positioned.fill(
+          child: Container(
+            color: Colors.black,
+            child: Navigator(
+              key: _navigatorKey,
+              initialRoute: '/page0',
+              onGenerateRoute: (settings) {
+                switch (settings.name) {
+                  case '/page0':
+                    return _createRoute(PageDiagram());
+                  case '/page1':
+                    return _createRoute(PageTop3());
+                  case '/page2':
+                    return _createRoute(PagePrize());
+                  case '/page3':
+                    return _createRoute(PageSchedule());
+                  case '/page4':
+                    return _createRoute(PageQuote());
+                  case '/page5':
+                    return _createRoute(PageAdvertising());
+                  case '/page6':
+                    return _createRoute(PageLivestream(isKiss: false));
+                  case '/page7':
+                    return _createRoute(PageLivestream(isKiss: true));
+                  default:
+                    return MaterialPageRoute(builder: (_) => const Center(child: Text('Unknown Page')));
+                }
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          top: 5,
+          right: 5,
+          child: IconButton(
+            onPressed: () async {
+              if (titleBarVisible) {
+                windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+                setState(() => titleBarVisible = false);
+                await windowManager.setFullScreen(true);
+              } else {
+                windowManager.setTitleBarStyle(TitleBarStyle.normal);
+                setState(() => titleBarVisible = true);
+                await windowManager.setFullScreen(false);
+              }
+            },
+            icon: Icon(
+              titleBarVisible ? Icons.open_in_full : Icons.close_fullscreen,
+              color: titleBarVisible ? Colors.grey : const Color.fromARGB(255, 67, 67, 67),
+              size: GlobalSettings.fullscreenIconSize,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Route _createRoute(Widget page) {
+    if (animateNavigation) {
+      return PageRouteBuilder(
+        transitionDuration: Duration(milliseconds: customDurations.navigationTransition),
+        pageBuilder: (_, animation, secondaryAnimation) => backgroundContainer(child: page),
+        transitionsBuilder: (_, animation, secondaryAnimation, child) {
+          const curve = Curves.ease;
+
+          // New page slides in from right → center
+          final inTween = Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: curve));
+
+          // Old page slides from center → left
+          final outTween = Tween<Offset>(
+            begin: Offset.zero,
+            end: const Offset(-1.0, 0.0),
+          ).chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(inTween),
+            child: SlideTransition(
+              position: secondaryAnimation.drive(outTween),
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
+    return PageRouteBuilder(
+      pageBuilder: (_, __, ___) => backgroundContainer(child: page),
+    );
+  }
+
+  Widget backgroundContainer({Widget? child}) {
+    return Container(
+      decoration: const BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage("assets/background.png"),
+          fit: BoxFit.cover,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
