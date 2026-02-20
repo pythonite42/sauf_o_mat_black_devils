@@ -301,13 +301,15 @@ class _PageDiagramState extends State<PageDiagram> {
                                                       child: Stack(
                                                         children: [
                                                           Row(children: [
+                                                            Stack(children: [
                                                             Container(
                                                               height: constraints.maxHeight * 0.5,
                                                               width: totalWidth * shot / chartMaxValue,
                                                               decoration: BoxDecoration(
                                                                 color: data!.color!.withValues(alpha: 0.9),
                                                                 borderRadius: BorderRadius.horizontal(
-                                                                  right: Radius.circular(constraints.maxHeight * 0.08),
+                                                                    right:
+                                                                        Radius.circular(constraints.maxHeight * 0.08),
                                                                 ),
                                                                 boxShadow: [
                                                                   BoxShadow(
@@ -318,6 +320,15 @@ class _PageDiagramState extends State<PageDiagram> {
                                                                 ],
                                                               ),
                                                             ),
+                                                              Text(
+                                                                ' ${shot.toStringAsFixed(0)} Shots',
+                                                                style: TextStyle(
+                                                                  fontSize: fontSizeLegend,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  color: fontColor,
+                                                                ),
+                                                              ),
+                                                            ]),
                                                             Visibility(
                                                               visible: false,
                                                               maintainSize: true,
